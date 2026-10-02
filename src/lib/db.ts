@@ -3,7 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { Movie, MovieInput, ReviewInput, MovieStatus } from '@/types';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'pelislog.db');
+const DB_PATH = process.env.VERCEL
+  ? path.join('/tmp', 'pelislog.db')
+  : path.join(process.cwd(), 'data', 'pelislog.db');
 
 let db: DatabaseSync | null = null;
 
