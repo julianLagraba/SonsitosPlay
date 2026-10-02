@@ -32,7 +32,7 @@ function getGenreName(genreId: number): string | null {
 
 interface AddMovieModalProps {
   onClose: () => void;
-  onAdd: (movie: { title: string; year?: number | null; synopsis?: string | null; poster_url?: string | null }) => void;
+  onAdd: (movie: { title: string; year?: number | null; synopsis?: string | null; poster_url?: string | null; genre?: string | null }) => void;
 }
 
 export default function AddMovieModal({ onClose, onAdd }: AddMovieModalProps) {

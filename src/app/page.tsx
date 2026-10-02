@@ -8,7 +8,7 @@ import SearchBar from '@/components/SearchBar';
 import FilterButtons, { FilterType } from '@/components/FilterButtons';
 import RussianRoulette from '@/components/RussianRoulette';
 import AddMovieModal from '@/components/AddMovieModal';
-import { Plus, Dices } from 'lucide-react';
+import { Plus, Dices, Film } from 'lucide-react';
 
 export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([]);
