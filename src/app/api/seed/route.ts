@@ -3,8 +3,8 @@ import { seedMovies, getAllMovies } from '@/lib/db';
 
 export async function POST() {
   try {
-    seedMovies();
-    const movies = getAllMovies();
+    await seedMovies();
+    const movies = await getAllMovies();
     return NextResponse.json({
       message: 'Base de datos inicializada correctamente',
       count: movies.length,

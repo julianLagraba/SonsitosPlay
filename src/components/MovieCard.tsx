@@ -70,7 +70,7 @@ const MovieCard = memo(function MovieCard({ movie, onStatusChange, onDelete, onC
 
   return (
     <div
-      className="movie-card glass rounded-2xl overflow-hidden cursor-pointer"
+      className="movie-card rounded-2xl overflow-hidden cursor-pointer"
       onClick={handleClick}
     >
       {/* Poster */}

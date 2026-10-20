@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Movie, MovieStatus } from '@/types';
 import MovieCard from '@/components/MovieCard';
 import MovieModal from '@/components/MovieModal';
@@ -16,16 +16,21 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showRoulette, setShowRoulette] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [counts, setCounts] = useState({ all: 0, para_ver: 0, viendo: 0, ya_vista: 0 });
+
+  // Último estado conocido, para poder revertir cambios optimistas si falla la red.
+  const moviesRef = useRef<Movie[]>([]);
+  useEffect(() => {
+    moviesRef.current = movies;
+  }, [movies]);
 
   const fetchMovies = useCallback(async () => {
     try {
-      const response = await fetch('/api/movies');
+      const response = await fetch('/api/movies', { cache: 'no-store' });
+      if (!response.ok) throw new Error('No se pudieron cargar las películas');
       const data = await response.json();
-      setMovies(data.movies);
-      setCounts(data.stats);
+      setMovies(data.movies ?? []);
     } catch (error) {
       console.error('Error fetching movies:', error);
     } finally {
@@ -36,6 +41,31 @@ export default function Home() {
   useEffect(() => {
     fetchMovies();
   }, [fetchMovies]);
+
+  const updateMovieLocally = useCallback((id: number, patch: Partial<Movie>) => {
+    setMovies((current) =>
+      current.map((movie) => (movie.id === id ? { ...movie, ...patch } : movie))
+    );
+  }, []);
+
+  // La película abierta se deriva del estado: el modal se actualiza solo.
+  const selectedMovie = useMemo(
+    () =>
+      selectedMovieId === null
+        ? null
+        : movies.find((movie) => movie.id === selectedMovieId) ?? null,
+    [movies, selectedMovieId]
+  );
+
+  const counts = useMemo(
+    () => ({
+      all: movies.length,
+      para_ver: movies.filter((movie) => movie.status === 'para_ver').length,
+      viendo: movies.filter((movie) => movie.status === 'viendo').length,
+      ya_vista: movies.filter((movie) => movie.status === 'ya_vista').length,
+    }),
+    [movies]
+  );
 
   const filteredMovies = useMemo(() => {
     let result = movies;
@@ -49,7 +79,11 @@ export default function Home() {
       // Show all
     } else if (activeFilter.startsWith('rating_')) {
       const rating = parseInt(activeFilter.split('_')[1], 10);
-      result = result.filter((movie) => movie.rating === rating);
+      // La nota es de 1 a 10 y los filtros muestran 1 a 5 estrellas.
+      result = result.filter(
+        (movie) =>
+          movie.rating !== null && Math.round(movie.rating / 2) === rating
+      );
     } else {
       result = result.filter((movie) => movie.status === activeFilter);
     }
@@ -57,38 +91,79 @@ export default function Home() {
     return result;
   }, [movies, searchQuery, activeFilter]);
 
-  const handleStatusChange = useCallback(async (id: number, status: MovieStatus) => {
-    try {
-      await fetch(`/api/movies/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      await fetchMovies();
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  }, [fetchMovies]);
+  const handleOpenMovie = useCallback((movie: Movie) => {
+    setSelectedMovieId(movie.id);
+  }, []);
 
-  const handleReviewSubmit = useCallback(async (id: number, rating: number, review: string) => {
-    try {
-      console.log('handleReviewSubmit llamado con:', { id, rating, review });
-      const response = await fetch(`/api/movies/${id}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rating, review }),
-      });
-      console.log('Respuesta del servidor:', response.status);
-      const data = await response.json();
-      console.log('Datos recibidos:', data);
-      await fetchMovies();
-    } catch (error) {
-      console.error('Error submitting review:', error);
-    }
-  }, [fetchMovies]);
+  const handleStatusChange = useCallback(
+    async (id: number, status: MovieStatus) => {
+      const previous = moviesRef.current.find((movie) => movie.id === id);
+      // Cambio optimista: se ve al instante en la tarjeta y en el modal.
+      updateMovieLocally(id, { status });
 
-  const handleAddMovie = useCallback(async (movieData: { title: string; year?: number | null; synopsis?: string | null; poster_url?: string | null; genre?: string | null }) => {
-    try {
+      try {
+        const response = await fetch(`/api/movies/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+
+        if (!response.ok) {
+          throw new Error('No se pudo actualizar el estado');
+        }
+      } catch (error) {
+        if (previous) {
+          updateMovieLocally(id, { status: previous.status });
+        }
+        throw error;
+      }
+    },
+    [updateMovieLocally]
+  );
+
+  const handleReviewSubmit = useCallback(
+    async (id: number, rating: number, review: string) => {
+      const previous = moviesRef.current.find((movie) => movie.id === id);
+      updateMovieLocally(id, { rating, review, status: 'ya_vista' });
+
+      try {
+        const response = await fetch(`/api/movies/${id}/review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rating, review }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.error || 'No se pudo guardar la reseña');
+        }
+
+        if (data.movie) {
+          updateMovieLocally(id, data.movie);
+        }
+      } catch (error) {
+        if (previous) {
+          updateMovieLocally(id, {
+            rating: previous.rating,
+            review: previous.review,
+            status: previous.status,
+          });
+        }
+        throw error;
+      }
+    },
+    [updateMovieLocally]
+  );
+
+  const handleAddMovie = useCallback(
+    async (movieData: {
+      title: string;
+      year?: number | null;
+      synopsis?: string | null;
+      poster_url?: string | null;
+      genre?: string | null;
+    }) => {
       const response = await fetch('/api/movies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,44 +176,44 @@ export default function Home() {
         throw new Error(data.error || 'Error al agregar película');
       }
 
-      await fetchMovies();
-    } catch (error) {
-      console.error('Error adding movie:', error);
-      alert(error instanceof Error ? error.message : 'Error al agregar película');
-    }
-  }, [fetchMovies]);
+      if (data.movie) {
+        setMovies((current) => [
+          data.movie,
+          ...current.filter((movie) => movie.id !== data.movie.id),
+        ]);
+      } else {
+        await fetchMovies();
+      }
+    },
+    [fetchMovies]
+  );
 
   const handleDeleteMovie = useCallback(async (id: number) => {
-    try {
-      const response = await fetch(`/api/movies/${id}`, {
-        method: 'DELETE',
-      });
+    const previous = moviesRef.current;
+    setMovies((current) => current.filter((movie) => movie.id !== id));
+    setSelectedMovieId((current) => (current === id ? null : current));
 
+    try {
+      const response = await fetch(`/api/movies/${id}`, { method: 'DELETE' });
       if (!response.ok) {
         throw new Error('Error al eliminar película');
       }
-
-      await fetchMovies();
     } catch (error) {
-      console.error('Error deleting movie:', error);
-      alert('Error al eliminar película');
+      setMovies(previous);
+      alert('No se pudo eliminar la película. Revisá tu conexión.');
     }
-  }, [fetchMovies]);
+  }, []);
 
   const handleRouletteSpin = useCallback(async (): Promise<Movie | null> => {
     try {
       const response = await fetch('/api/roulette', { method: 'POST' });
       const data = await response.json();
-      if (data.movie) {
-        await fetchMovies();
-        return data.movie;
-      }
-      return null;
+      return data.movie ?? null;
     } catch (error) {
       console.error('Error with roulette:', error);
       return null;
     }
-  }, [fetchMovies]);
+  }, []);
 
   if (isLoading) {
     return (
@@ -222,7 +297,7 @@ export default function Home() {
                 movie={movie}
                 onStatusChange={handleStatusChange}
                 onDelete={handleDeleteMovie}
-                onClick={setSelectedMovie}
+                onClick={handleOpenMovie}
               />
             ))}
           </div>
@@ -243,7 +318,7 @@ export default function Home() {
       {selectedMovie && (
         <MovieModal
           movie={selectedMovie}
-          onClose={() => setSelectedMovie(null)}
+          onClose={() => setSelectedMovieId(null)}
           onStatusChange={handleStatusChange}
           onReviewSubmit={handleReviewSubmit}
           onDelete={handleDeleteMovie}

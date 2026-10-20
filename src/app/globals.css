@@ -34,15 +34,15 @@ body {
 /* Glassmorphism utilities */
 .glass {
   background: var(--bg-card);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-color);
 }
 
 .glass-strong {
   background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -85,6 +85,9 @@ body {
 
 /* Card hover effect */
 .movie-card {
+  /* Sin backdrop-filter: tener decenas de tarjetas con blur trababa el scroll en mobile. */
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 

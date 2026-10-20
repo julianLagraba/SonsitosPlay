@@ -61,14 +61,16 @@ npm install
 
 # 2. Configurar variables de entorno
 cp .env.example .env.local
-# Edita .env.local y agrega tu TMDB_API_KEY
+# Edita .env.local y agrega tu TMDB_API_KEY y tu DATABASE_URL (Postgres/Neon)
 
-# 3. Inicializar la base de datos (opcional, se hace automáticamente)
-curl -X POST http://localhost:3000/api/seed
+# 3. Inicializar la base de datos (opcional, se crea sola en la primera consulta)
+npm run db:init
 
 # 4. Ejecutar en desarrollo
 npm run dev
 ```
+
+> **Importante:** la app necesita una base Postgres (Neon / Vercel Postgres) porque en Vercel no existe disco persistente. Si no configurás `DATABASE_URL`, las rutas de la API van a devolver un error explicándolo.
 
 ## API de Películas (TMDB)
 
@@ -83,30 +85,36 @@ TMDB_API_KEY=tu_api_key_aqui
 
 ## Esquema de Base de Datos
 
+Base de datos: **PostgreSQL** (Neon / Vercel Postgres).
+
 ### Tabla: `movies`
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
-| id | INTEGER PK | Identificador único |
+| id | SERIAL PK | Identificador único |
 | title | TEXT NOT NULL | Título de la película |
 | year | INTEGER | Año de lanzamiento |
 | synopsis | TEXT | Sinopsis/descripción |
 | poster_url | TEXT | URL del póster oficial |
+| genre | TEXT | Género |
 | status | TEXT | Estado: para_ver, viendo, ya_vista |
-| rating | INTEGER | Calificación 1-5 |
+| rating | DOUBLE PRECISION | Calificación 1-10 (admite decimales) |
 | review | TEXT | Reseña personal |
-| created_at | TEXT | Fecha de creación |
-| updated_at | TEXT | Fecha de actualización |
+| type | TEXT | movie o series |
+| created_at | TIMESTAMPTZ | Fecha de creación |
+| updated_at | TIMESTAMPTZ | Fecha de actualización |
 
 ### Tabla: `reviews`
 
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
-| id | INTEGER PK | Identificador único |
+| id | SERIAL PK | Identificador único |
 | movie_id | INTEGER FK | Referencia a movies.id |
-| rating | INTEGER | Calificación 1-5 |
+| rating | DOUBLE PRECISION | Calificación 1-10 |
 | review | TEXT | Texto de la reseña |
-| created_at | TEXT | Fecha de creación |
+| created_at | TIMESTAMPTZ | Fecha de creación |
+
+El esquema se crea automáticamente en la primera consulta. También se puede forzar con `npm run db:init`.
 
 ## API Endpoints
 
@@ -125,7 +133,19 @@ TMDB_API_KEY=tu_api_key_aqui
 
 ### Vercel (Recomendado)
 
+La app guarda los datos en Postgres, no en el disco de Vercel (que es temporal). Pasos:
+
+1. En el panel de Vercel del proyecto, ir a **Storage → Create Database → Neon**.
+2. Conectarla al proyecto. Vercel agrega la variable `DATABASE_URL` automáticamente.
+3. Hacer **Redeploy** para que la función reciba la variable.
+4. (Opcional) Copiar la cadena de conexión a `.env.local` y migrar los datos que ya tengas en la base SQLite local:
+
+   ```bash
+   npm run db:migrate
+   ```
+
 ```bash
+# Alternativa por CLI
 npm i -g vercel
 vercel
 ```
@@ -147,6 +167,6 @@ CMD ["npm", "start"]
 
 - **Framework**: Next.js 14 (App Router)
 - **Estilos**: Tailwind CSS
-- **Base de Datos**: SQLite (mejor-sqlite3)
+- **Base de Datos**: PostgreSQL serverless (Neon) con `@neondatabase/serverless`
 - **Iconos**: Lucide React
 - **API**: TMDB (The Movie Database)

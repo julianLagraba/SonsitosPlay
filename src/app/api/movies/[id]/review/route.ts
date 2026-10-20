@@ -25,7 +25,7 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
-    const movie = updateMovieReview(id, {
+    const movie = await updateMovieReview(id, {
       rating: body.rating,
       review: body.review.trim(),
     });

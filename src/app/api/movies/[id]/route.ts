@@ -6,9 +6,11 @@ type Params = {
   params: { id: string };
 };
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(_request: Request, { params }: Params) {
   try {
-    const movie = getMovieById(parseInt(params.id, 10));
+    const movie = await getMovieById(parseInt(params.id, 10));
     if (!movie) {
       return NextResponse.json(
         { error: 'Película no encontrada' },
@@ -38,7 +40,7 @@ export async function PATCH(request: Request, { params }: Params) {
           { status: 400 }
         );
       }
-      const movie = updateMovieStatus(id, body.status);
+      const movie = await updateMovieStatus(id, body.status);
       if (!movie) {
         return NextResponse.json(
           { error: 'Película no encontrada' },
@@ -48,7 +50,7 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json({ movie });
     }
 
-    const movie = updateMovie(id, body);
+    const movie = await updateMovie(id, body);
     if (!movie) {
       return NextResponse.json(
         { error: 'Película no encontrada' },
@@ -68,7 +70,7 @@ export async function PATCH(request: Request, { params }: Params) {
 export async function DELETE(_request: Request, { params }: Params) {
   try {
     const id = parseInt(params.id, 10);
-    const success = deleteMovie(id);
+    const success = await deleteMovie(id);
     if (!success) {
       return NextResponse.json(
         { error: 'Película no encontrada' },

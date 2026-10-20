@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server';
 import { getAllMovies, createMovie, seedMovies, getStats } from '@/lib/db';
 import { MovieInput } from '@/types';
 
+// Evita que Next cachee la respuesta y devuelva datos viejos.
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
-    seedMovies();
-    const movies = getAllMovies();
-    const stats = getStats();
+    await seedMovies();
+    const movies = await getAllMovies();
+    const stats = await getStats();
     return NextResponse.json({ movies, stats });
   } catch (error) {
     console.error('Error fetching movies:', error);
@@ -28,7 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const movie = createMovie({
+    const movie = await createMovie({
       title: body.title.trim(),
       year: body.year || null,
       synopsis: body.synopsis || null,

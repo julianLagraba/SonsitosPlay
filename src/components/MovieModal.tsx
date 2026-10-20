@@ -2,15 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import { Movie, MovieStatus } from '@/types';
-import { X, Star, Clock, CheckCircle, Eye, Trash2, Calendar, Film } from 'lucide-react';
+import {
+  X,
+  Star,
+  Clock,
+  CheckCircle,
+  CheckCircle2,
+  Eye,
+  Trash2,
+  Calendar,
+  Film,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 
 interface MovieModalProps {
   movie: Movie;
   onClose: () => void;
-  onStatusChange: (id: number, status: MovieStatus) => void;
-  onReviewSubmit: (id: number, rating: number, review: string) => void;
-  onDelete: (id: number) => void;
+  onStatusChange: (id: number, status: MovieStatus) => Promise<void>;
+  onReviewSubmit: (id: number, rating: number, review: string) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
 }
+
+type Message = { type: 'success' | 'error'; text: string } | null;
 
 const statusConfig = {
   para_ver: {
@@ -54,46 +68,134 @@ function RatingStars({ rating, size = 'w-5 h-5' }: { rating: number; size?: stri
   );
 }
 
+function ActionMessage({ message }: { message: Message }) {
+  if (!message) return null;
+
+  return (
+    <p
+      className={`mt-3 flex items-center gap-1.5 text-sm fade-in ${
+        message.type === 'success' ? 'text-green-400' : 'text-red-400'
+      }`}
+    >
+      {message.type === 'success' ? (
+        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+      ) : (
+        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+      )}
+      {message.text}
+    </p>
+  );
+}
+
 export default function MovieModal({ movie, onClose, onStatusChange, onReviewSubmit, onDelete }: MovieModalProps) {
   const config = statusConfig[movie.status];
   const StatusIcon = config.icon;
+
   const [ratingInput, setRatingInput] = useState<string>(movie.rating?.toString() || '');
   const [reviewText, setReviewText] = useState(movie.review || '');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSavingReview, setIsSavingReview] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<Message>(null);
+  const [reviewMessage, setReviewMessage] = useState<Message>(null);
 
-  // Sync state when movie prop changes
+  // Sync inputs when the movie changes (y al guardar, con la respuesta del servidor).
   useEffect(() => {
     setRatingInput(movie.rating?.toString() || '');
     setReviewText(movie.review || '');
   }, [movie.id, movie.rating, movie.review]);
 
-  const handleReviewSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Reinicia los mensajes al abrir otra película.
+  useEffect(() => {
+    setStatusMessage(null);
+    setReviewMessage(null);
+  }, [movie.id]);
+
+  // Los mensajes de éxito desaparecen solos.
+  useEffect(() => {
+    if (!statusMessage || statusMessage.type !== 'success') return;
+    const timer = setTimeout(() => setStatusMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [statusMessage]);
+
+  useEffect(() => {
+    if (!reviewMessage || reviewMessage.type !== 'success') return;
+    const timer = setTimeout(() => setReviewMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [reviewMessage]);
+
+  const handleStatusChange = async (status: MovieStatus) => {
+    if (status === movie.status || isUpdatingStatus) return;
+
+    setIsUpdatingStatus(true);
+    setStatusMessage(null);
+
+    try {
+      await onStatusChange(movie.id, status);
+      setStatusMessage({
+        type: 'success',
+        text: `Estado actualizado a "${statusConfig[status].label}"`,
+      });
+    } catch {
+      setStatusMessage({
+        type: 'error',
+        text: 'No se pudo cambiar el estado. Intentá de nuevo.',
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleReviewSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Formulario enviado');
-    console.log('ratingInput:', ratingInput);
-    console.log('reviewText:', reviewText);
-    console.log('movie.id:', movie.id);
 
     const rating = parseFloat(ratingInput);
     if (isNaN(rating) || rating < 1 || rating > 10) {
-      alert('Ingresa una calificación entre 1 y 10');
+      setReviewMessage({
+        type: 'error',
+        text: 'Ingresá una calificación entre 1 y 10.',
+      });
       return;
     }
 
-    console.log('Enviando al servidor...');
-    onReviewSubmit(movie.id, rating, reviewText);
+    if (!reviewText.trim()) {
+      setReviewMessage({ type: 'error', text: 'Escribí una reseña antes de guardar.' });
+      return;
+    }
+
+    setIsSavingReview(true);
+    setReviewMessage(null);
+
+    try {
+      await onReviewSubmit(movie.id, rating, reviewText.trim());
+      setReviewMessage({ type: 'success', text: '¡Reseña guardada!' });
+    } catch (error) {
+      setReviewMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo guardar la reseña.',
+      });
+    } finally {
+      setIsSavingReview(false);
+    }
   };
 
-  const handleDelete = () => {
-    if (confirm('¿Eliminar esta película?')) {
-      onDelete(movie.id);
+  const handleDelete = async () => {
+    if (isDeleting) return;
+    if (!confirm('¿Eliminar esta película?')) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(movie.id);
       onClose();
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const numericRating = parseFloat(ratingInput) || 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80" onClick={onClose}>
       <div
         className="glass-strong rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto fade-in safe-area-bottom"
         onClick={(e) => e.stopPropagation()}
@@ -158,7 +260,7 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
           )}
 
           {/* Calificación actual */}
-          {movie.rating && (
+          {movie.rating !== null && (
             <div>
               <h3 className="text-sm font-medium text-white/50 mb-2">Tu calificación</h3>
               <div className="flex items-center gap-3">
@@ -182,8 +284,9 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
             <h3 className="text-sm font-medium text-white/50 mb-3">Cambiar estado</h3>
             <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => onStatusChange(movie.id, 'para_ver')}
-                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-medium transition-all ${
+                onClick={() => handleStatusChange('para_ver')}
+                disabled={isUpdatingStatus}
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-60 ${
                   movie.status === 'para_ver'
                     ? 'bg-blue-500/30 text-blue-400 border-2 border-blue-500/50'
                     : 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20'
@@ -193,8 +296,9 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
                 Para ver
               </button>
               <button
-                onClick={() => onStatusChange(movie.id, 'viendo')}
-                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-medium transition-all ${
+                onClick={() => handleStatusChange('viendo')}
+                disabled={isUpdatingStatus}
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-60 ${
                   movie.status === 'viendo'
                     ? 'bg-yellow-500/30 text-yellow-400 border-2 border-yellow-500/50'
                     : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20'
@@ -204,8 +308,9 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
                 Viendo
               </button>
               <button
-                onClick={() => onStatusChange(movie.id, 'ya_vista')}
-                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-medium transition-all ${
+                onClick={() => handleStatusChange('ya_vista')}
+                disabled={isUpdatingStatus}
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-60 ${
                   movie.status === 'ya_vista'
                     ? 'bg-green-500/30 text-green-400 border-2 border-green-500/50'
                     : 'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20'
@@ -215,6 +320,7 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
                 Ya vista
               </button>
             </div>
+            <ActionMessage message={statusMessage} />
           </div>
 
           {/* Formulario de reseña para películas vistas */}
@@ -260,20 +366,28 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
               </div>
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent-hover transition-colors"
+                disabled={isSavingReview}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:cursor-wait"
               >
-                {movie.review ? 'Actualizar reseña' : 'Guardar reseña'}
+                {isSavingReview && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSavingReview
+                  ? 'Guardando...'
+                  : movie.review
+                    ? 'Actualizar reseña'
+                    : 'Guardar reseña'}
               </button>
+              <ActionMessage message={reviewMessage} />
             </form>
           )}
 
           {/* Botón eliminar */}
           <button
             onClick={handleDelete}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+            disabled={isDeleting}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-60"
           >
-            <Trash2 className="w-4 h-4" />
-            Eliminar película
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            {isDeleting ? 'Eliminando...' : 'Eliminar película'}
           </button>
         </div>
       </div>

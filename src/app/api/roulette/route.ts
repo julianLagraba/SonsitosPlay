@@ -3,7 +3,7 @@ import { getRandomMovieByStatus } from '@/lib/db';
 
 export async function POST() {
   try {
-    const movie = getRandomMovieByStatus('para_ver');
+    const movie = await getRandomMovieByStatus('para_ver');
 
     if (!movie) {
       return NextResponse.json(
