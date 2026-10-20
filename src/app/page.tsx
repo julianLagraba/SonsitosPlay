@@ -138,7 +138,8 @@ export default function Home() {
   const handleReviewSubmit = useCallback(
     async (id: number, rating: number, review: string) => {
       const previous = moviesRef.current.find((movie) => movie.id === id);
-      updateMovieLocally(id, { rating, review, status: 'ya_vista' });
+      // Puntuar no cambia el estado: podés puntuar una serie que seguís viendo.
+      updateMovieLocally(id, { rating, review });
 
       try {
         const response = await fetch(`/api/movies/${id}/review`, {
@@ -161,7 +162,6 @@ export default function Home() {
           updateMovieLocally(id, {
             rating: previous.rating,
             review: previous.review,
-            status: previous.status,
           });
         }
         throw error;

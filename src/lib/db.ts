@@ -166,7 +166,7 @@ export async function updateMovieReview(
   const rows = await fetchRows<Movie>(
     `WITH updated AS (
        UPDATE movies
-       SET rating = $1, review = $2, status = 'ya_vista', updated_at = NOW()
+       SET rating = $1, review = $2, updated_at = NOW()
        WHERE id = $3
        RETURNING *
      ), inserted AS (

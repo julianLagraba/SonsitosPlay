@@ -6,10 +6,10 @@ Aplicación web para gestionar una lista de películas compartida con estilo Let
 
 - **Gestión de Estados**: Clasifica películas y series en "Para ver", "Viendo" y "Ya vista"
 - **Películas y Series**: listas separadas con pestañas, cada una con su búsqueda, filtros y ruleta
-- **Sistema de Reseñas**: Calificación de 1-5 estrellas y reseñas personales
-- **Buscador y Filtros**: Búsqueda por título y filtros por estado/calificación
+- **Sistema de Puntajes**: Calificación de 1 a 10 (admite decimales) y reseña personal opcional, disponible para películas y series en cualquier estado
+- **Buscador y Filtros**: Búsqueda por título y filtros por estado/puntaje
 - **Integración TMDB**: Autocompletado de sinopsis, año y póster oficial para películas y series
-- **Ruleta Rusa**: Selección aleatoria de películas pendientes
+- **Ruleta Rusa**: Selección aleatoria de películas o series pendientes
 - **Diseño Mobile First**: 100% responsive, dark mode, glassmorphism
 
 ## Estructura del Proyecto
@@ -128,7 +128,7 @@ El esquema se crea automáticamente en la primera consulta. También se puede fo
 | GET | /api/movies/:id | Obtener título por ID |
 | PATCH | /api/movies/:id | Actualizar título |
 | DELETE | /api/movies/:id | Eliminar título |
-| POST | /api/movies/:id/review | Agregar reseña |
+| POST | /api/movies/:id/review | Guardar puntaje y reseña (opcional) |
 | POST | /api/roulette?type=movie\|series | Título aleatorio de "Para ver" |
 | GET | /api/search?q=... | Buscar películas y series en TMDB |
 | POST | /api/seed | Inicializar datos |

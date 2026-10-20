@@ -156,13 +156,8 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
     if (isNaN(rating) || rating < 1 || rating > 10) {
       setReviewMessage({
         type: 'error',
-        text: 'Ingresá una calificación entre 1 y 10.',
+        text: 'Ingresá un puntaje entre 1 y 10.',
       });
-      return;
-    }
-
-    if (!reviewText.trim()) {
-      setReviewMessage({ type: 'error', text: 'Escribí una reseña antes de guardar.' });
       return;
     }
 
@@ -171,11 +166,11 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
 
     try {
       await onReviewSubmit(movie.id, rating, reviewText.trim());
-      setReviewMessage({ type: 'success', text: '¡Reseña guardada!' });
+      setReviewMessage({ type: 'success', text: '¡Puntaje guardado!' });
     } catch (error) {
       setReviewMessage({
         type: 'error',
-        text: error instanceof Error ? error.message : 'No se pudo guardar la reseña.',
+        text: error instanceof Error ? error.message : 'No se pudo guardar el puntaje.',
       });
     } finally {
       setIsSavingReview(false);
@@ -275,7 +270,7 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
           {/* Calificación actual */}
           {movie.rating !== null && (
             <div>
-              <h3 className="text-sm font-medium text-white/50 mb-2">Tu calificación</h3>
+              <h3 className="text-sm font-medium text-white/50 mb-2">Tu puntaje</h3>
               <div className="flex items-center gap-3">
                 <RatingStars rating={movie.rating} size="w-6 h-6" />
                 <span className="text-2xl font-bold text-yellow-400">{movie.rating}</span>
@@ -336,62 +331,64 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
             <ActionMessage message={statusMessage} />
           </div>
 
-          {/* Formulario de reseña para películas vistas */}
-          {movie.status === 'ya_vista' && (
-            <form onSubmit={handleReviewSubmit} className="space-y-4 pt-4 border-t border-white/10">
+          {/* Formulario de puntaje: disponible para películas y series, en cualquier estado */}
+          <form onSubmit={handleReviewSubmit} className="space-y-4 pt-4 border-t border-white/10">
+            <div>
               <h3 className="text-sm font-medium text-white/50">
-                {movie.review ? 'Editar reseña' : 'Agregar reseña'}
+                {movie.rating !== null ? 'Editar puntaje y reseña' : 'Puntuar y reseñar'}
               </h3>
-              <div>
-                <label className="text-xs text-white/50 mb-2 block">Tu calificación (1-10)</label>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      step="0.1"
-                      value={ratingInput}
-                      onChange={(e) => setRatingInput(e.target.value)}
-                      className="w-20 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-center text-lg font-bold focus:outline-none focus:border-accent/50"
-                      placeholder="0"
-                    />
-                    <span className="text-white/40 text-lg">/10</span>
-                  </div>
-                  <div className="flex-1">
-                    <RatingStars rating={numericRating} size="w-6 h-6" />
-                  </div>
+              <p className="text-xs text-white/30 mt-1">
+                Podés guardar tu puntaje aunque todavía no la hayas terminado.
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Tu puntaje (1-10)</label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.1"
+                    value={ratingInput}
+                    onChange={(e) => setRatingInput(e.target.value)}
+                    className="w-20 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-center text-lg font-bold focus:outline-none focus:border-accent/50"
+                    placeholder="0"
+                  />
+                  <span className="text-white/40 text-lg">/10</span>
                 </div>
-                <p className="text-xs text-white/30 mt-2">
-                  Escribe un número del 1 al 10 (puede ser decimal, ej: 9.7)
-                </p>
+                <div className="flex-1">
+                  <RatingStars rating={numericRating} size="w-6 h-6" />
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-white/50 mb-2 block">Tu reseña</label>
-                <textarea
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  placeholder="¿Qué te pareció? Cuéntanos..."
-                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-accent/50 resize-none"
-                  rows={4}
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isSavingReview}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:cursor-wait"
-              >
-                {isSavingReview && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isSavingReview
-                  ? 'Guardando...'
-                  : movie.review
-                    ? 'Actualizar reseña'
-                    : 'Guardar reseña'}
-              </button>
-              <ActionMessage message={reviewMessage} />
-            </form>
-          )}
+              <p className="text-xs text-white/30 mt-2">
+                Escribe un número del 1 al 10 (puede ser decimal, ej: 9.7)
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Tu reseña (opcional)</label>
+              <textarea
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                placeholder="¿Qué te pareció? (opcional)"
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-accent/50 resize-none"
+                rows={4}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSavingReview}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-accent text-white font-medium hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:cursor-wait"
+            >
+              {isSavingReview && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isSavingReview
+                ? 'Guardando...'
+                : movie.rating !== null
+                  ? 'Actualizar puntaje'
+                  : 'Guardar puntaje'}
+            </button>
+            <ActionMessage message={reviewMessage} />
+          </form>
 
           {/* Botón eliminar */}
           <button
