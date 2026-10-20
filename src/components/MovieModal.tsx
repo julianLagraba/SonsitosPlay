@@ -12,6 +12,7 @@ import {
   Trash2,
   Calendar,
   Film,
+  Tv,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
@@ -90,6 +91,8 @@ function ActionMessage({ message }: { message: Message }) {
 export default function MovieModal({ movie, onClose, onStatusChange, onReviewSubmit, onDelete }: MovieModalProps) {
   const config = statusConfig[movie.status];
   const StatusIcon = config.icon;
+  const isSeries = movie.type === 'series';
+  const kindLabel = isSeries ? 'serie' : 'película';
 
   const [ratingInput, setRatingInput] = useState<string>(movie.rating?.toString() || '');
   const [reviewText, setReviewText] = useState(movie.review || '');
@@ -181,7 +184,7 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
 
   const handleDelete = async () => {
     if (isDeleting) return;
-    if (!confirm('¿Eliminar esta película?')) return;
+    if (!confirm(`¿Eliminar esta ${kindLabel}?`)) return;
 
     setIsDeleting(true);
     try {
@@ -241,6 +244,16 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
                   {movie.genre}
                 </span>
               )}
+              <span
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${
+                  isSeries
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                    : 'bg-white/10 text-white/60 border-white/20'
+                }`}
+              >
+                {isSeries ? <Tv className="w-3 h-3" /> : <Film className="w-3 h-3" />}
+                {isSeries ? 'Serie' : 'Película'}
+              </span>
               <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${config.color}`}>
                 <StatusIcon className="w-3 h-3" />
                 {config.label}
@@ -387,7 +400,7 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-60"
           >
             {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            {isDeleting ? 'Eliminando...' : 'Eliminar película'}
+            {isDeleting ? 'Eliminando...' : `Eliminar ${kindLabel}`}
           </button>
         </div>
       </div>

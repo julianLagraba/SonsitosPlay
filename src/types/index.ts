@@ -42,6 +42,7 @@ export interface TMDBMovie {
   vote_average: number;
   genre_ids?: number[];
   media_type?: MediaType;
+  popularity?: number;
 }
 
 export interface TMDBResponse {

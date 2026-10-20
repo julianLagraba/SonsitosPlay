@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Movie, MovieStatus } from '@/types';
+import { Movie, MediaType, MovieStatus } from '@/types';
 import MovieCard from '@/components/MovieCard';
 import MovieModal from '@/components/MovieModal';
 import SearchBar from '@/components/SearchBar';
 import FilterButtons, { FilterType } from '@/components/FilterButtons';
 import RussianRoulette from '@/components/RussianRoulette';
 import AddMovieModal from '@/components/AddMovieModal';
-import { Plus, Dices, Film } from 'lucide-react';
+import { Plus, Dices, Film, Tv } from 'lucide-react';
 
 export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -16,6 +16,7 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showRoulette, setShowRoulette] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [mediaType, setMediaType] = useState<MediaType>('movie');
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -57,18 +58,31 @@ export default function Home() {
     [movies, selectedMovieId]
   );
 
+  const visibleMovies = useMemo(
+    () => movies.filter((movie) => (movie.type ?? 'movie') === mediaType),
+    [movies, mediaType]
+  );
+
   const counts = useMemo(
     () => ({
-      all: movies.length,
-      para_ver: movies.filter((movie) => movie.status === 'para_ver').length,
-      viendo: movies.filter((movie) => movie.status === 'viendo').length,
-      ya_vista: movies.filter((movie) => movie.status === 'ya_vista').length,
+      all: visibleMovies.length,
+      para_ver: visibleMovies.filter((movie) => movie.status === 'para_ver').length,
+      viendo: visibleMovies.filter((movie) => movie.status === 'viendo').length,
+      ya_vista: visibleMovies.filter((movie) => movie.status === 'ya_vista').length,
+    }),
+    [visibleMovies]
+  );
+
+  const typeCounts = useMemo(
+    () => ({
+      movie: movies.filter((movie) => (movie.type ?? 'movie') === 'movie').length,
+      series: movies.filter((movie) => movie.type === 'series').length,
     }),
     [movies]
   );
 
   const filteredMovies = useMemo(() => {
-    let result = movies;
+    let result = visibleMovies;
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -89,7 +103,7 @@ export default function Home() {
     }
 
     return result;
-  }, [movies, searchQuery, activeFilter]);
+  }, [visibleMovies, searchQuery, activeFilter]);
 
   const handleOpenMovie = useCallback((movie: Movie) => {
     setSelectedMovieId(movie.id);
@@ -163,6 +177,7 @@ export default function Home() {
       synopsis?: string | null;
       poster_url?: string | null;
       genre?: string | null;
+      type?: MediaType;
     }) => {
       const response = await fetch('/api/movies', {
         method: 'POST',
@@ -173,7 +188,7 @@ export default function Home() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al agregar película');
+        throw new Error(data.error || 'Error al agregar el título');
       }
 
       if (data.movie) {
@@ -181,6 +196,8 @@ export default function Home() {
           data.movie,
           ...current.filter((movie) => movie.id !== data.movie.id),
         ]);
+        // Mostramos la pestaña donde quedó el título agregado.
+        setMediaType(data.movie.type === 'series' ? 'series' : 'movie');
       } else {
         await fetchMovies();
       }
@@ -206,14 +223,14 @@ export default function Home() {
 
   const handleRouletteSpin = useCallback(async (): Promise<Movie | null> => {
     try {
-      const response = await fetch('/api/roulette', { method: 'POST' });
+      const response = await fetch(`/api/roulette?type=${mediaType}`, { method: 'POST' });
       const data = await response.json();
       return data.movie ?? null;
     } catch (error) {
       console.error('Error with roulette:', error);
       return null;
     }
-  }, []);
+  }, [mediaType]);
 
   if (isLoading) {
     return (
@@ -238,7 +255,9 @@ export default function Home() {
               />
               <div>
                 <h1 className="text-xl font-bold text-white">SonsitosPlay</h1>
-                <p className="text-xs text-white/50">{counts.all} películas en tu lista</p>
+                <p className="text-xs text-white/50">
+                  {counts.all} {mediaType === 'series' ? 'series' : 'películas'} en tu lista
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -257,6 +276,46 @@ export default function Home() {
                 <span className="text-sm font-medium hidden sm:inline">Agregar</span>
               </button>
             </div>
+          </div>
+
+          {/* Tipo de contenido */}
+          <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-white/5 border border-white/10 mb-4">
+            <button
+              onClick={() => setMediaType('movie')}
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                mediaType === 'movie'
+                  ? 'bg-accent text-white shadow-lg shadow-accent/25'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Film className="w-4 h-4" />
+              Películas
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs ${
+                  mediaType === 'movie' ? 'bg-white/20' : 'bg-white/10'
+                }`}
+              >
+                {typeCounts.movie}
+              </span>
+            </button>
+            <button
+              onClick={() => setMediaType('series')}
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                mediaType === 'series'
+                  ? 'bg-accent text-white shadow-lg shadow-accent/25'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Tv className="w-4 h-4" />
+              Series
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs ${
+                  mediaType === 'series' ? 'bg-white/20' : 'bg-white/10'
+                }`}
+              >
+                {typeCounts.series}
+              </span>
+            </button>
           </div>
 
           {/* Search */}
@@ -278,15 +337,23 @@ export default function Home() {
         {filteredMovies.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4">
-              <Film className="w-8 h-8 text-white/20" />
+              {mediaType === 'series' ? (
+                <Tv className="w-8 h-8 text-white/20" />
+              ) : (
+                <Film className="w-8 h-8 text-white/20" />
+              )}
             </div>
             <h3 className="text-lg font-medium text-white/60 mb-2">
-              {searchQuery ? 'No se encontraron películas' : 'Tu lista está vacía'}
+              {searchQuery
+                ? 'No se encontraron resultados'
+                : mediaType === 'series'
+                  ? 'Todavía no agregaste series'
+                  : 'Todavía no agregaste películas'}
             </h3>
             <p className="text-sm text-white/40 max-w-xs">
               {searchQuery
                 ? 'Intenta con otro término de búsqueda'
-                : 'Agrega películas para comenzar a organizar tu lista'}
+                : `Agregá ${mediaType === 'series' ? 'una serie' : 'una película'} para comenzar a organizar tu lista`}
             </p>
           </div>
         ) : (
@@ -334,6 +401,7 @@ export default function Home() {
 
       {showAddModal && (
         <AddMovieModal
+          defaultType={mediaType}
           onClose={() => setShowAddModal(false)}
           onAdd={handleAddMovie}
         />

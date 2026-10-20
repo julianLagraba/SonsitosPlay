@@ -4,10 +4,11 @@ Aplicación web para gestionar una lista de películas compartida con estilo Let
 
 ## Características
 
-- **Gestión de Estados**: Clasifica películas en "Para ver", "Viendo" y "Ya vista"
+- **Gestión de Estados**: Clasifica películas y series en "Para ver", "Viendo" y "Ya vista"
+- **Películas y Series**: listas separadas con pestañas, cada una con su búsqueda, filtros y ruleta
 - **Sistema de Reseñas**: Calificación de 1-5 estrellas y reseñas personales
 - **Buscador y Filtros**: Búsqueda por título y filtros por estado/calificación
-- **Integración TMDB**: Autocompletado de sinopsis, año y póster oficial
+- **Integración TMDB**: Autocompletado de sinopsis, año y póster oficial para películas y series
 - **Ruleta Rusa**: Selección aleatoria de películas pendientes
 - **Diseño Mobile First**: 100% responsive, dark mode, glassmorphism
 
@@ -72,7 +73,7 @@ npm run dev
 
 > **Importante:** la app necesita una base Postgres (Neon / Vercel Postgres) porque en Vercel no existe disco persistente. Si no configurás `DATABASE_URL`, las rutas de la API van a devolver un error explicándolo.
 
-## API de Películas (TMDB)
+## API de TMDB (películas y series)
 
 1. Crea una cuenta en [TMDB](https://www.themoviedb.org/)
 2. Ve a Settings > API
@@ -82,6 +83,8 @@ npm run dev
 ```
 TMDB_API_KEY=tu_api_key_aqui
 ```
+
+El buscador consulta `search/movie` y `search/tv` en paralelo y unifica los resultados, indicando si cada uno es película o serie.
 
 ## Esquema de Base de Datos
 
@@ -120,13 +123,14 @@ El esquema se crea automáticamente en la primera consulta. También se puede fo
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| GET | /api/movies | Obtener todas las películas |
-| POST | /api/movies | Crear nueva película |
-| GET | /api/movies/:id | Obtener película por ID |
-| PATCH | /api/movies/:id | Actualizar película |
-| DELETE | /api/movies/:id | Eliminar película |
+| GET | /api/movies?type=movie\|series | Obtener títulos (opcionalmente filtrados por tipo) |
+| POST | /api/movies | Crear película o serie (campo `type`) |
+| GET | /api/movies/:id | Obtener título por ID |
+| PATCH | /api/movies/:id | Actualizar título |
+| DELETE | /api/movies/:id | Eliminar título |
 | POST | /api/movies/:id/review | Agregar reseña |
-| POST | /api/roulette | Película aleatoria |
+| POST | /api/roulette?type=movie\|series | Título aleatorio de "Para ver" |
+| GET | /api/search?q=... | Buscar películas y series en TMDB |
 | POST | /api/seed | Inicializar datos |
 
 ## Despliegue

@@ -1,5 +1,5 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
-import { Movie, MovieInput, ReviewInput, MovieStatus } from '@/types';
+import { Movie, MovieInput, MediaType, ReviewInput, MovieStatus } from '@/types';
 
 type Sql = NeonQueryFunction<false, false>;
 
@@ -76,20 +76,41 @@ async function fetchRows<T>(query: string, params: unknown[] = []): Promise<T[]>
   return rows as T[];
 }
 
-export async function getAllMovies(): Promise<Movie[]> {
+export async function getAllMovies(type?: MediaType): Promise<Movie[]> {
+  if (type) {
+    return fetchRows<Movie>(
+      'SELECT * FROM movies WHERE type = $1 ORDER BY created_at DESC, id DESC',
+      [type]
+    );
+  }
   return fetchRows<Movie>(
     'SELECT * FROM movies ORDER BY created_at DESC, id DESC'
   );
 }
 
-export async function getMoviesByStatus(status: MovieStatus): Promise<Movie[]> {
+export async function getMoviesByStatus(
+  status: MovieStatus,
+  type?: MediaType
+): Promise<Movie[]> {
+  if (type) {
+    return fetchRows<Movie>(
+      'SELECT * FROM movies WHERE status = $1 AND type = $2 ORDER BY created_at DESC, id DESC',
+      [status, type]
+    );
+  }
   return fetchRows<Movie>(
     'SELECT * FROM movies WHERE status = $1 ORDER BY created_at DESC, id DESC',
     [status]
   );
 }
 
-export async function searchMovies(query: string): Promise<Movie[]> {
+export async function searchMovies(query: string, type?: MediaType): Promise<Movie[]> {
+  if (type) {
+    return fetchRows<Movie>(
+      'SELECT * FROM movies WHERE title ILIKE $1 AND type = $2 ORDER BY created_at DESC, id DESC',
+      [`%${query}%`, type]
+    );
+  }
   return fetchRows<Movie>(
     'SELECT * FROM movies WHERE title ILIKE $1 ORDER BY created_at DESC, id DESC',
     [`%${query}%`]
@@ -218,8 +239,17 @@ export async function deleteMovie(id: number): Promise<boolean> {
 }
 
 export async function getRandomMovieByStatus(
-  status: MovieStatus
+  status: MovieStatus,
+  type?: MediaType
 ): Promise<Movie | null> {
+  if (type) {
+    const rows = await fetchRows<Movie>(
+      'SELECT * FROM movies WHERE status = $1 AND type = $2 ORDER BY RANDOM() LIMIT 1',
+      [status, type]
+    );
+    return rows[0] ?? null;
+  }
+
   const rows = await fetchRows<Movie>(
     'SELECT * FROM movies WHERE status = $1 ORDER BY RANDOM() LIMIT 1',
     [status]
@@ -232,7 +262,7 @@ export async function seedMovies(): Promise<void> {
   await ensureSchema();
 }
 
-export async function getStats(): Promise<{
+export async function getStats(type?: MediaType): Promise<{
   total: number;
   para_ver: number;
   viendo: number;
@@ -249,7 +279,9 @@ export async function getStats(): Promise<{
       COUNT(*) FILTER (WHERE status = 'para_ver')::int AS para_ver,
       COUNT(*) FILTER (WHERE status = 'viendo')::int AS viendo,
       COUNT(*) FILTER (WHERE status = 'ya_vista')::int AS ya_vista
-    FROM movies`
+    FROM movies
+    ${type ? 'WHERE type = $1' : ''}`,
+    type ? [type] : []
   );
 
   return rows[0] ?? { total: 0, para_ver: 0, viendo: 0, ya_vista: 0 };

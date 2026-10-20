@@ -70,7 +70,7 @@ export default function RussianRoulette({ onSpin, onClose }: RussianRouletteProp
               )}
             </div>
             <p className="text-sm text-white/60">
-              ¡Es tu película! Ahora puedes marcarla como &quot;Viendo&quot;.
+              ¡Es tu elección! Ahora podés marcarla como &quot;Viendo&quot;.
             </p>
           </div>
         )}
