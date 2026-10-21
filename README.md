@@ -4,6 +4,7 @@ Aplicación web para gestionar una lista de películas compartida con estilo Let
 
 ## Características
 
+- **Acceso privado**: login con usuario y contraseña, sesión persistente y cierre de sesión
 - **Gestión de Estados**: Clasifica películas y series en "Para ver", "Viendo" y "Ya vista"
 - **Películas y Series**: listas separadas con pestañas, cada una con su búsqueda, filtros y ruleta
 - **Sistema de Puntajes**: Calificación de 1 a 10 (admite decimales) y reseña personal opcional, disponible para películas y series en cualquier estado
@@ -23,6 +24,11 @@ pelislog/
 ├── src/
 │   ├── app/
 │   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   │   ├── login/
+│   │   │   │   │   └── route.ts
+│   │   │   │   └── logout/
+│   │   │   │       └── route.ts
 │   │   │   ├── movies/
 │   │   │   │   ├── [id]/
 │   │   │   │   │   ├── route.ts
@@ -37,6 +43,8 @@ pelislog/
 │   │   │       └── route.ts
 │   │   ├── globals.css
 │   │   ├── layout.tsx
+│   │   ├── login/
+│   │   │   └── page.tsx
 │   │   └── page.tsx
 │   ├── components/
 │   │   ├── AddMovieModal.tsx
@@ -47,10 +55,12 @@ pelislog/
 │   │   ├── SearchBar.tsx
 │   │   └── StatsModal.tsx
 │   ├── lib/
+│   │   ├── auth.ts
 │   │   ├── db.ts
 │   │   └── tmdb.ts
-│   └── types/
-│       └── index.ts
+│   ├── types/
+│   │   └── index.ts
+│   └── middleware.ts
 ├── public/
 │   └── manifest.json
 ├── .env.example
@@ -83,6 +93,23 @@ npm run dev
 ```
 
 > **Importante:** la app necesita una base Postgres (Neon / Vercel Postgres) porque en Vercel no existe disco persistente. Si no configurás `DATABASE_URL`, las rutas de la API van a devolver un error explicándolo.
+
+## Acceso
+
+La app está protegida con un login de un solo usuario. Por defecto las credenciales son:
+
+- Usuario: `julianOrnella`
+- Contraseña: `Sonsitos1234`
+
+Para cambiarlas sin tocar el código, definí en `.env.local` (y en Vercel para producción):
+
+```
+AUTH_USERNAME=tu_usuario
+AUTH_PASSWORD=tu_contraseña
+AUTH_SECRET=una_cadena_larga_y_aleatoria
+```
+
+La sesión se guarda en una cookie `httpOnly` firmada con HMAC y dura 30 días. El middleware redirige a `/login` a cualquier visitante sin sesión y responde `401` en las rutas de `/api/*`. El botón de cerrar sesión está en el header de la app.
 
 ## API de TMDB (películas y series)
 
@@ -158,6 +185,8 @@ El esquema se crea automáticamente en la primera consulta. También se puede fo
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
+| POST | /api/auth/login | Iniciar sesión (cookie de sesión) |
+| POST | /api/auth/logout | Cerrar sesión |
 | GET | /api/movies?type=movie\|series | Obtener títulos (opcionalmente filtrados por tipo) |
 | POST | /api/movies | Crear película o serie (campo `type`) |
 | GET | /api/movies/:id | Obtener título por ID |

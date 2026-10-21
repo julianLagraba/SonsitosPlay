@@ -9,7 +9,7 @@ import FilterButtons, { FilterType } from '@/components/FilterButtons';
 import RussianRoulette from '@/components/RussianRoulette';
 import AddMovieModal from '@/components/AddMovieModal';
 import StatsModal from '@/components/StatsModal';
-import { Plus, Dices, Film, Tv, BarChart3 } from 'lucide-react';
+import { Plus, Dices, Film, Tv, BarChart3, LogOut } from 'lucide-react';
 
 export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -283,6 +283,14 @@ export default function Home() {
     }
   }, [mediaType]);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      window.location.assign('/login');
+    }
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -311,7 +319,7 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
               <button
                 onClick={() => setShowStats(true)}
                 className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 transition-colors"
@@ -333,6 +341,14 @@ export default function Home() {
               >
                 <Plus className="w-4 h-4" />
                 <span className="text-sm font-medium hidden sm:inline">Agregar</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                title="Cerrar sesión"
+                aria-label="Cerrar sesión"
+                className="flex items-center justify-center p-2.5 rounded-xl text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
               </button>
             </div>
           </div>

@@ -118,8 +118,8 @@ body {
 
 /* Pulse glow for roulette button */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(229, 9, 20, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(229, 9, 20, 0.6); }
+  0%, 100% { box-shadow: 0 0 20px rgba(179, 36, 46, 0.25); }
+  50% { box-shadow: 0 0 40px rgba(179, 36, 46, 0.5); }
 }
 
 .pulse-glow {

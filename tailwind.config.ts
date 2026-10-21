@@ -17,8 +17,8 @@ const config: Config = {
           600: '#222230',
         },
         accent: {
-          DEFAULT: '#e50914',
-          hover: '#f6121d',
+          DEFAULT: '#b3242e',
+          hover: '#c9343e',
         },
       },
       backdropBlur: {
@@ -30,8 +30,8 @@ const config: Config = {
       },
       keyframes: {
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 20px rgba(229, 9, 20, 0.3)' },
-          '50%': { boxShadow: '0 0 40px rgba(229, 9, 20, 0.6)' },
+          '0%, 100%': { boxShadow: '0 0 20px rgba(179, 36, 46, 0.25)' },
+          '50%': { boxShadow: '0 0 40px rgba(179, 36, 46, 0.5)' },
         },
       },
     },
