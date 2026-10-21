@@ -24,12 +24,26 @@ const SCHEMA_STATEMENTS = [
     rating DOUBLE PRECISION CHECK (rating >= 1 AND rating <= 10),
     review TEXT,
     type TEXT NOT NULL DEFAULT 'movie' CHECK (type IN ('movie', 'series')),
+    tmdb_id INTEGER,
+    runtime INTEGER,
+    total_seasons INTEGER,
+    total_episodes INTEGER,
+    current_season INTEGER,
+    current_episode INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`,
+  // Migraciones idempotentes para bases creadas con versiones anteriores.
+  'ALTER TABLE movies ADD COLUMN IF NOT EXISTS tmdb_id INTEGER',
+  'ALTER TABLE movies ADD COLUMN IF NOT EXISTS runtime INTEGER',
+  'ALTER TABLE movies ADD COLUMN IF NOT EXISTS total_seasons INTEGER',
+  'ALTER TABLE movies ADD COLUMN IF NOT EXISTS total_episodes INTEGER',
+  'ALTER TABLE movies ADD COLUMN IF NOT EXISTS current_season INTEGER',
+  'ALTER TABLE movies ADD COLUMN IF NOT EXISTS current_episode INTEGER',
   'CREATE INDEX IF NOT EXISTS idx_movies_status ON movies(status)',
   'CREATE INDEX IF NOT EXISTS idx_movies_title ON movies(title)',
   'CREATE INDEX IF NOT EXISTS idx_movies_rating ON movies(rating)',
+  'CREATE INDEX IF NOT EXISTS idx_movies_tmdb_id ON movies(tmdb_id)',
   `CREATE TABLE IF NOT EXISTS reviews (
     id SERIAL PRIMARY KEY,
     movie_id INTEGER NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
@@ -131,8 +145,8 @@ export async function getMovieById(id: number): Promise<Movie | null> {
 
 export async function createMovie(input: MovieInput): Promise<Movie> {
   const rows = await fetchRows<Movie>(
-    `INSERT INTO movies (title, year, synopsis, poster_url, genre, status, type)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO movies (title, year, synopsis, poster_url, genre, status, type, tmdb_id, runtime, total_seasons, total_episodes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       input.title,
@@ -142,6 +156,10 @@ export async function createMovie(input: MovieInput): Promise<Movie> {
       input.genre ?? null,
       input.status || 'para_ver',
       input.type || 'movie',
+      input.tmdb_id ?? null,
+      input.runtime ?? null,
+      input.total_seasons ?? null,
+      input.total_episodes ?? null,
     ]
   );
   return rows[0];
@@ -214,6 +232,30 @@ export async function updateMovie(
   if (input.type !== undefined) {
     fields.push(`type = $${index++}`);
     values.push(input.type);
+  }
+  if (input.tmdb_id !== undefined) {
+    fields.push(`tmdb_id = $${index++}`);
+    values.push(input.tmdb_id ?? null);
+  }
+  if (input.runtime !== undefined) {
+    fields.push(`runtime = $${index++}`);
+    values.push(input.runtime ?? null);
+  }
+  if (input.total_seasons !== undefined) {
+    fields.push(`total_seasons = $${index++}`);
+    values.push(input.total_seasons ?? null);
+  }
+  if (input.total_episodes !== undefined) {
+    fields.push(`total_episodes = $${index++}`);
+    values.push(input.total_episodes ?? null);
+  }
+  if (input.current_season !== undefined) {
+    fields.push(`current_season = $${index++}`);
+    values.push(input.current_season ?? null);
+  }
+  if (input.current_episode !== undefined) {
+    fields.push(`current_episode = $${index++}`);
+    values.push(input.current_episode ?? null);
   }
 
   if (fields.length === 0) {

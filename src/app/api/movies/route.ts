@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error fetching movies:', error);
     return NextResponse.json(
-      { error: 'Error al obtener películas' },
+      { error: 'Error al obtener los títulos' },
       { status: 500 }
     );
   }
@@ -46,13 +46,19 @@ export async function POST(request: Request) {
       genre: body.genre || null,
       status: body.status || 'para_ver',
       type: body.type === 'series' ? 'series' : 'movie',
+      tmdb_id: typeof body.tmdb_id === 'number' ? body.tmdb_id : null,
+      runtime: typeof body.runtime === 'number' ? body.runtime : null,
+      total_seasons:
+        typeof body.total_seasons === 'number' ? body.total_seasons : null,
+      total_episodes:
+        typeof body.total_episodes === 'number' ? body.total_episodes : null,
     });
 
     return NextResponse.json({ movie }, { status: 201 });
   } catch (error) {
     console.error('Error creating movie:', error);
     return NextResponse.json(
-      { error: 'Error al crear película' },
+      { error: 'Error al crear el título' },
       { status: 500 }
     );
   }

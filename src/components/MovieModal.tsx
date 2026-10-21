@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Movie, MovieStatus } from '@/types';
+import { MediaDetails, Movie, MovieStatus, WatchProviders } from '@/types';
 import {
   X,
   Star,
@@ -15,6 +15,11 @@ import {
   Tv,
   Loader2,
   AlertCircle,
+  Play,
+  ExternalLink,
+  Users,
+  Minus,
+  Plus,
 } from 'lucide-react';
 
 interface MovieModalProps {
@@ -22,6 +27,7 @@ interface MovieModalProps {
   onClose: () => void;
   onStatusChange: (id: number, status: MovieStatus) => Promise<void>;
   onReviewSubmit: (id: number, rating: number, review: string) => Promise<void>;
+  onProgressChange: (id: number, season: number, episode: number) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
 }
 
@@ -44,6 +50,17 @@ const statusConfig = {
     color: 'bg-green-500/20 text-green-400 border-green-500/30',
   },
 };
+
+const providerGroups: {
+  key: keyof Omit<WatchProviders, 'link'>;
+  label: string;
+}[] = [
+  { key: 'flatrate', label: 'Incluida en tu suscripción' },
+  { key: 'free', label: 'Gratis' },
+  { key: 'ads', label: 'Con anuncios' },
+  { key: 'rent', label: 'Alquilar' },
+  { key: 'buy', label: 'Comprar' },
+];
 
 // Convert 1-10 rating to 5 stars display
 function RatingStars({ rating, size = 'w-5 h-5' }: { rating: number; size?: string }) {
@@ -88,7 +105,7 @@ function ActionMessage({ message }: { message: Message }) {
   );
 }
 
-export default function MovieModal({ movie, onClose, onStatusChange, onReviewSubmit, onDelete }: MovieModalProps) {
+export default function MovieModal({ movie, onClose, onStatusChange, onReviewSubmit, onProgressChange, onDelete }: MovieModalProps) {
   const config = statusConfig[movie.status];
   const StatusIcon = config.icon;
   const isSeries = movie.type === 'series';
@@ -101,6 +118,39 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
   const [isDeleting, setIsDeleting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<Message>(null);
   const [reviewMessage, setReviewMessage] = useState<Message>(null);
+  const [details, setDetails] = useState<MediaDetails | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [seasonInput, setSeasonInput] = useState(movie.current_season ?? 1);
+  const [episodeInput, setEpisodeInput] = useState(movie.current_episode ?? 1);
+  const [isSavingProgress, setIsSavingProgress] = useState(false);
+  const [progressMessage, setProgressMessage] = useState<Message>(null);
+
+  // Detalles de TMDB: plataformas, trailer, reparto y temporadas.
+  useEffect(() => {
+    if (!movie.tmdb_id) {
+      setDetails(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDetailsLoading(true);
+
+    fetch(`/api/details?type=${movie.type ?? 'movie'}&id=${movie.tmdb_id}`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled) setDetails(data);
+      })
+      .catch(() => {
+        if (!cancelled) setDetails(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [movie.tmdb_id, movie.type]);
 
   // Sync inputs when the movie changes (y al guardar, con la respuesta del servidor).
   useEffect(() => {
@@ -108,10 +158,36 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
     setReviewText(movie.review || '');
   }, [movie.id, movie.rating, movie.review]);
 
+  useEffect(() => {
+    setSeasonInput(movie.current_season ?? 1);
+    setEpisodeInput(movie.current_episode ?? 1);
+  }, [movie.id, movie.current_season, movie.current_episode]);
+
+  // Ajusta temporada/episodio a los límites reales de la serie.
+  useEffect(() => {
+    if (!details) return;
+    const max = Math.max(
+      1,
+      details.total_seasons ?? details.seasons.length ?? 1
+    );
+    setSeasonInput((current) => Math.min(Math.max(1, current), max));
+  }, [details]);
+
+  useEffect(() => {
+    if (!details) return;
+    const season = details.seasons.find(
+      (item) => item.season_number === seasonInput
+    );
+    if (!season) return;
+    const max = Math.max(1, season.episode_count);
+    setEpisodeInput((current) => Math.min(Math.max(1, current), max));
+  }, [details, seasonInput]);
+
   // Reinicia los mensajes al abrir otra película.
   useEffect(() => {
     setStatusMessage(null);
     setReviewMessage(null);
+    setProgressMessage(null);
   }, [movie.id]);
 
   // Los mensajes de éxito desaparecen solos.
@@ -126,6 +202,12 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
     const timer = setTimeout(() => setReviewMessage(null), 3000);
     return () => clearTimeout(timer);
   }, [reviewMessage]);
+
+  useEffect(() => {
+    if (!progressMessage || progressMessage.type !== 'success') return;
+    const timer = setTimeout(() => setProgressMessage(null), 3000);
+    return () => clearTimeout(timer);
+  }, [progressMessage]);
 
   const handleStatusChange = async (status: MovieStatus) => {
     if (status === movie.status || isUpdatingStatus) return;
@@ -188,6 +270,76 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleProgressSave = async () => {
+    if (!details || isSavingProgress) return;
+
+    setIsSavingProgress(true);
+    setProgressMessage(null);
+
+    try {
+      await onProgressChange(
+        movie.id,
+        seasonInput,
+        Math.min(episodeInput, Math.max(1, episodesForSeason(seasonInput)))
+      );
+      setProgressMessage({ type: 'success', text: 'Progreso guardado' });
+    } catch (error) {
+      setProgressMessage({
+        type: 'error',
+        text:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo guardar el progreso.',
+      });
+    } finally {
+      setIsSavingProgress(false);
+    }
+  };
+
+  const seasons = details?.seasons ?? [];
+  const maxSeason = Math.max(
+    1,
+    details?.total_seasons ?? seasons.length ?? 1
+  );
+
+  function episodesForSeason(season: number): number {
+    return seasons.find((item) => item.season_number === season)?.episode_count ?? 0;
+  }
+
+  const maxEpisode = Math.max(1, episodesForSeason(seasonInput));
+  const totalEpisodes = seasons.reduce(
+    (total, season) => total + season.episode_count,
+    0
+  );
+  const hasSavedProgress = movie.current_season !== null;
+  const draftStarted = seasonInput > 1 || episodeInput > 1;
+  const watchedEpisodes =
+    hasSavedProgress || draftStarted
+      ? seasons
+          .filter((season) => season.season_number < seasonInput)
+          .reduce((total, season) => total + season.episode_count, 0) +
+        Math.min(episodeInput, Math.max(1, episodesForSeason(seasonInput)))
+      : 0;
+  const progressPercent =
+    totalEpisodes > 0
+      ? Math.min(100, Math.round((watchedEpisodes / totalEpisodes) * 100))
+      : 0;
+  const providers = details?.providers ?? null;
+
+  const changeSeason = (delta: number) => {
+    const next = Math.min(maxSeason, Math.max(1, seasonInput + delta));
+    setSeasonInput(next);
+    setEpisodeInput((current) =>
+      Math.min(Math.max(1, current), Math.max(1, episodesForSeason(next)))
+    );
+  };
+
+  const changeEpisode = (delta: number) => {
+    setEpisodeInput((current) =>
+      Math.min(maxEpisode, Math.max(1, current + delta))
+    );
   };
 
   const numericRating = parseFloat(ratingInput) || 0;
@@ -264,6 +416,207 @@ export default function MovieModal({ movie, onClose, onStatusChange, onReviewSub
             <div>
               <h3 className="text-sm font-medium text-white/50 mb-2">Sinopsis</h3>
               <p className="text-white/80 leading-relaxed">{movie.synopsis}</p>
+            </div>
+          )}
+
+          {/* Trailer y reparto (TMDB) */}
+          {details?.trailer_key && (
+            <a
+              href={`https://www.youtube.com/watch?v=${details.trailer_key}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 transition-colors"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              Ver trailer
+            </a>
+          )}
+
+          {details && details.cast.length > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-white/50 mb-2 flex items-center gap-2">
+                <Users className="w-4 h-4" /> Reparto
+              </h3>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
+                {details.cast.map((member) => (
+                  <div key={member.id} className="w-16 flex-shrink-0 text-center">
+                    <div className="w-14 h-14 mx-auto rounded-full overflow-hidden bg-surface-700">
+                      {member.profile_path ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
+                          alt={member.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white/30 font-bold">
+                          {member.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-white/70 mt-1 leading-tight line-clamp-2">
+                      {member.name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Dónde ver */}
+          {movie.tmdb_id && (
+            <div>
+              <h3 className="text-sm font-medium text-white/50 mb-2">Dónde ver</h3>
+              {providers ? (
+                <div className="space-y-3">
+                  {providerGroups.map(({ key, label }) => {
+                    const list = providers[key] ?? [];
+                    if (list.length === 0) return null;
+                    return (
+                      <div key={key}>
+                        <p className="text-xs text-white/40 mb-1.5">{label}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {list.map((provider) => (
+                            <span
+                              key={`${key}-${provider.provider_id}`}
+                              title={provider.provider_name}
+                              className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10"
+                            >
+                              {provider.logo_path && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                                  alt={provider.provider_name}
+                                  className="w-5 h-5 rounded"
+                                />
+                              )}
+                              <span className="text-xs text-white/80">
+                                {provider.provider_name}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {providers.link && (
+                    <a
+                      href={providers.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+                    >
+                      Ver todas las opciones <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  <p className="text-[10px] text-white/25">
+                    Datos de disponibilidad: JustWatch
+                  </p>
+                </div>
+              ) : detailsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-white/40">
+                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                  Buscando plataformas...
+                </div>
+              ) : (
+                <p className="text-sm text-white/40">
+                  No hay datos de plataformas para Argentina.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Progreso de series */}
+          {isSeries && (
+            <div>
+              <h3 className="text-sm font-medium text-white/50 mb-3">Progreso</h3>
+              {details && seasons.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-[11px] text-white/40 mb-1.5">Temporada</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => changeSeason(-1)}
+                            disabled={seasonInput <= 1}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 disabled:opacity-30"
+                            aria-label="Temporada anterior"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold text-white">
+                            {seasonInput}
+                          </span>
+                          <button
+                            onClick={() => changeSeason(1)}
+                            disabled={seasonInput >= maxSeason}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 disabled:opacity-30"
+                            aria-label="Temporada siguiente"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-white/40 mb-1.5">Episodio</p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => changeEpisode(-1)}
+                            disabled={episodeInput <= 1}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 disabled:opacity-30"
+                            aria-label="Episodio anterior"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold text-white">
+                            {episodeInput}
+                          </span>
+                          <button
+                            onClick={() => changeEpisode(1)}
+                            disabled={episodeInput >= maxEpisode}
+                            className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 disabled:opacity-30"
+                            aria-label="Episodio siguiente"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-lg font-bold text-accent">
+                      {progressPercent}%
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className="h-full bg-accent transition-all"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-white/40">
+                    {watchedEpisodes} de {totalEpisodes} episodios · Temporada{' '}
+                    {seasonInput} de {maxSeason}
+                  </p>
+                  <button
+                    onClick={handleProgressSave}
+                    disabled={isSavingProgress}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent/20 text-accent border border-accent/30 hover:bg-accent/30 transition-colors disabled:opacity-60"
+                  >
+                    {isSavingProgress && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {isSavingProgress ? 'Guardando...' : 'Guardar progreso'}
+                  </button>
+                  <ActionMessage message={progressMessage} />
+                </div>
+              ) : detailsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-white/40">
+                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                  Cargando temporadas...
+                </div>
+              ) : (
+                <p className="text-sm text-white/40">
+                  No hay datos de temporadas para esta serie.
+                </p>
+              )}
             </div>
           )}
 

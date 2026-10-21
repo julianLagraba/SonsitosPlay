@@ -61,6 +61,10 @@ interface AddMovieModalProps {
     poster_url?: string | null;
     genre?: string | null;
     type?: MediaType;
+    tmdb_id?: number | null;
+    runtime?: number | null;
+    total_seasons?: number | null;
+    total_episodes?: number | null;
   }) => Promise<void>;
 }
 
@@ -160,6 +164,7 @@ export default function AddMovieModal({
             ? getGenreName(selectedMovie.genre_ids[0])
             : null,
           type: selectedMovie.media_type ?? 'movie',
+          tmdb_id: selectedMovie.id,
         }
       : { title: manualTitle.trim(), type: manualType };
 
@@ -167,7 +172,33 @@ export default function AddMovieModal({
     setErrorMessage('');
 
     try {
-      await onAdd(payload);
+      let metadata: {
+        runtime?: number | null;
+        total_seasons?: number | null;
+        total_episodes?: number | null;
+      } = {};
+
+      if (selectedMovie) {
+        // Guardamos duración/temporadas para estadísticas y progreso.
+        try {
+          const mediaType = selectedMovie.media_type ?? 'movie';
+          const detailsResponse = await fetch(
+            `/api/details?type=${mediaType}&id=${selectedMovie.id}`
+          );
+          if (detailsResponse.ok) {
+            const details = await detailsResponse.json();
+            metadata = {
+              runtime: details.runtime ?? null,
+              total_seasons: details.total_seasons ?? null,
+              total_episodes: details.total_episodes ?? null,
+            };
+          }
+        } catch {
+          // Si falla TMDB, el título se agrega igual.
+        }
+      }
+
+      await onAdd({ ...payload, ...metadata });
       onClose();
     } catch (error) {
       setErrorMessage(

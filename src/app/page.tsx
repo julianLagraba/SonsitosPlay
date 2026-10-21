@@ -8,7 +8,8 @@ import SearchBar from '@/components/SearchBar';
 import FilterButtons, { FilterType } from '@/components/FilterButtons';
 import RussianRoulette from '@/components/RussianRoulette';
 import AddMovieModal from '@/components/AddMovieModal';
-import { Plus, Dices, Film, Tv } from 'lucide-react';
+import StatsModal from '@/components/StatsModal';
+import { Plus, Dices, Film, Tv, BarChart3 } from 'lucide-react';
 
 export default function Home() {
   const [movies, setMovies] = useState<Movie[]>([]);
@@ -16,6 +17,7 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showRoulette, setShowRoulette] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [mediaType, setMediaType] = useState<MediaType>('movie');
   const [selectedMovieId, setSelectedMovieId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -170,6 +172,51 @@ export default function Home() {
     [updateMovieLocally]
   );
 
+  const handleProgressChange = useCallback(
+    async (id: number, season: number, episode: number) => {
+      const previous = moviesRef.current.find((movie) => movie.id === id);
+      const patch: Partial<Movie> = {
+        current_season: season,
+        current_episode: episode,
+      };
+
+      // Si arrancás una serie que estaba pendiente, pasa a "Viendo".
+      if (previous?.status === 'para_ver') {
+        patch.status = 'viendo';
+      }
+
+      updateMovieLocally(id, patch);
+
+      try {
+        const response = await fetch(`/api/movies/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.error || 'No se pudo guardar el progreso');
+        }
+
+        if (data.movie) {
+          updateMovieLocally(id, data.movie);
+        }
+      } catch (error) {
+        if (previous) {
+          updateMovieLocally(id, {
+            current_season: previous.current_season,
+            current_episode: previous.current_episode,
+            status: previous.status,
+          });
+        }
+        throw error;
+      }
+    },
+    [updateMovieLocally]
+  );
+
   const handleAddMovie = useCallback(
     async (movieData: {
       title: string;
@@ -178,6 +225,10 @@ export default function Home() {
       poster_url?: string | null;
       genre?: string | null;
       type?: MediaType;
+      tmdb_id?: number | null;
+      runtime?: number | null;
+      total_seasons?: number | null;
+      total_episodes?: number | null;
     }) => {
       const response = await fetch('/api/movies', {
         method: 'POST',
@@ -261,6 +312,14 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowStats(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 transition-colors"
+                title="Estadísticas"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="text-sm font-medium hidden sm:inline">Estadísticas</span>
+              </button>
               <button
                 onClick={() => setShowRoulette(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent/20 text-accent border border-accent/30 hover:bg-accent/30 transition-colors"
@@ -388,8 +447,13 @@ export default function Home() {
           onClose={() => setSelectedMovieId(null)}
           onStatusChange={handleStatusChange}
           onReviewSubmit={handleReviewSubmit}
+          onProgressChange={handleProgressChange}
           onDelete={handleDeleteMovie}
         />
+      )}
+
+      {showStats && (
+        <StatsModal movies={movies} onClose={() => setShowStats(false)} />
       )}
 
       {showRoulette && (

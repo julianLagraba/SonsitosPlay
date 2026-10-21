@@ -63,7 +63,7 @@ const MovieCard = memo(function MovieCard({ movie, onStatusChange, onDelete, onC
 
   const handleDelete = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm('¿Eliminar esta película?')) {
+    if (confirm('¿Eliminar este título?')) {
       onDelete(movie.id);
     }
   }, [onDelete, movie.id]);
@@ -128,6 +128,11 @@ const MovieCard = memo(function MovieCard({ movie, onStatusChange, onDelete, onC
         </h3>
         {movie.year && (
           <p className="text-xs text-white/50 mt-1">{movie.year}</p>
+        )}
+        {movie.type === 'series' && movie.current_season !== null && (
+          <p className="text-xs font-medium text-accent mt-1">
+            T{movie.current_season} E{movie.current_episode ?? 1}
+          </p>
         )}
       </div>
     </div>

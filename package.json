@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:init": "node scripts/init-db.mjs",
-    "db:migrate": "node scripts/migrate-local-data.mjs"
+    "db:migrate": "node scripts/migrate-local-data.mjs",
+    "db:backfill": "node scripts/backfill-tmdb.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",

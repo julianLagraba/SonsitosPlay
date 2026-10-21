@@ -7,8 +7,12 @@ Aplicación web para gestionar una lista de películas compartida con estilo Let
 - **Gestión de Estados**: Clasifica películas y series en "Para ver", "Viendo" y "Ya vista"
 - **Películas y Series**: listas separadas con pestañas, cada una con su búsqueda, filtros y ruleta
 - **Sistema de Puntajes**: Calificación de 1 a 10 (admite decimales) y reseña personal opcional, disponible para películas y series en cualquier estado
+- **Dónde ver**: plataformas disponibles en Argentina (Netflix, Prime Video, Max, etc.) con logos y opciones de alquiler o compra. Datos de TMDB/JustWatch
+- **Progreso de Series**: temporada y episodio actual, porcentaje completado y badge "T2 E5" en la tarjeta. Al guardar progreso, la serie pasa a "Viendo"
+- **Tráiler y Reparto**: trailer de YouTube y elenco principal dentro del detalle de cada título
+- **Estadísticas**: totales, promedio de puntajes, géneros favoritos, horas estimadas y mejor puntuadas
 - **Buscador y Filtros**: Búsqueda por título y filtros por estado/puntaje
-- **Integración TMDB**: Autocompletado de sinopsis, año y póster oficial para películas y series
+- **Integración TMDB**: Autocompletado de sinopsis, año, póster, duración y temporadas para películas y series
 - **Ruleta Rusa**: Selección aleatoria de películas o series pendientes
 - **Diseño Mobile First**: 100% responsive, dark mode, glassmorphism
 
@@ -25,6 +29,8 @@ pelislog/
 │   │   │   │   │   └── review/
 │   │   │   │   │       └── route.ts
 │   │   │   │   └── route.ts
+│   │   │   ├── details/
+│   │   │   │   └── route.ts
 │   │   │   ├── roulette/
 │   │   │   │   └── route.ts
 │   │   │   └── seed/
@@ -36,8 +42,10 @@ pelislog/
 │   │   ├── AddMovieModal.tsx
 │   │   ├── FilterButtons.tsx
 │   │   ├── MovieCard.tsx
+│   │   ├── MovieModal.tsx
 │   │   ├── RussianRoulette.tsx
-│   │   └── SearchBar.tsx
+│   │   ├── SearchBar.tsx
+│   │   └── StatsModal.tsx
 │   ├── lib/
 │   │   ├── db.ts
 │   │   └── tmdb.ts
@@ -67,7 +75,10 @@ cp .env.example .env.local
 # 3. Inicializar la base de datos (opcional, se crea sola en la primera consulta)
 npm run db:init
 
-# 4. Ejecutar en desarrollo
+# 4. (Opcional) Completar TMDB ID, duración y temporadas de títulos ya cargados
+npm run db:backfill
+
+# 5. Ejecutar en desarrollo
 npm run dev
 ```
 
@@ -85,6 +96,24 @@ TMDB_API_KEY=tu_api_key_aqui
 ```
 
 El buscador consulta `search/movie` y `search/tv` en paralelo y unifica los resultados, indicando si cada uno es película o serie.
+
+### Dónde ver, tráiler y reparto
+
+El endpoint `/api/details` consulta TMDB para obtener:
+
+- Plataformas disponibles en **Argentina** (`AR`), separadas en incluidas, gratis, con anuncios, alquiler y compra.
+- Tráiler oficial de YouTube y reparto principal.
+- Duración (películas) o duración por episodio y listado de temporadas (series).
+
+Los datos de disponibilidad los provee **JustWatch** a través de TMDB. La app muestra la atribución correspondiente en el detalle de cada título.
+
+Para los títulos cargados antes de esta funcionalidad, ejecutá:
+
+```bash
+npm run db:backfill
+```
+
+El script busca cada título en TMDB por nombre, año y tipo, y guarda `tmdb_id`, `runtime`, `total_seasons` y `total_episodes`. Es idempotente: solo completa los que faltan.
 
 ## Esquema de Base de Datos
 
@@ -104,6 +133,12 @@ Base de datos: **PostgreSQL** (Neon / Vercel Postgres).
 | rating | DOUBLE PRECISION | Calificación 1-10 (admite decimales) |
 | review | TEXT | Reseña personal |
 | type | TEXT | movie o series |
+| tmdb_id | INTEGER | ID del título en TMDB (para detalles, plataformas y tráiler) |
+| runtime | INTEGER | Minutos de la película o duración por episodio de la serie |
+| total_seasons | INTEGER | Cantidad de temporadas (series) |
+| total_episodes | INTEGER | Cantidad total de episodios (series) |
+| current_season | INTEGER | Temporada actual del progreso (series) |
+| current_episode | INTEGER | Episodio actual del progreso (series) |
 | created_at | TIMESTAMPTZ | Fecha de creación |
 | updated_at | TIMESTAMPTZ | Fecha de actualización |
 
@@ -129,6 +164,8 @@ El esquema se crea automáticamente en la primera consulta. También se puede fo
 | PATCH | /api/movies/:id | Actualizar título |
 | DELETE | /api/movies/:id | Eliminar título |
 | POST | /api/movies/:id/review | Guardar puntaje y reseña (opcional) |
+| PATCH | /api/movies/:id | Actualizar estado, progreso o metadata |
+| GET | /api/details?type=movie\|series&id=... | Plataformas, tráiler, reparto y temporadas desde TMDB |
 | POST | /api/roulette?type=movie\|series | Título aleatorio de "Para ver" |
 | GET | /api/search?q=... | Buscar películas y series en TMDB |
 | POST | /api/seed | Inicializar datos |

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updateMovieStatus, updateMovie, deleteMovie, getMovieById } from '@/lib/db';
+import { updateMovie, deleteMovie, getMovieById } from '@/lib/db';
 import { MovieStatus } from '@/types';
 
 type Params = {
@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: Params) {
     const movie = await getMovieById(parseInt(params.id, 10));
     if (!movie) {
       return NextResponse.json(
-        { error: 'Película no encontrada' },
+        { error: 'Título no encontrado' },
         { status: 404 }
       );
     }
@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: Params) {
   } catch (error) {
     console.error('Error fetching movie:', error);
     return NextResponse.json(
-      { error: 'Error al obtener película' },
+      { error: 'Error al obtener el título' },
       { status: 500 }
     );
   }
@@ -32,7 +32,7 @@ export async function PATCH(request: Request, { params }: Params) {
     const body = await request.json();
     const id = parseInt(params.id, 10);
 
-    if (body.status) {
+    if (body.status !== undefined) {
       const validStatuses: MovieStatus[] = ['para_ver', 'viendo', 'ya_vista'];
       if (!validStatuses.includes(body.status)) {
         return NextResponse.json(
@@ -40,20 +40,24 @@ export async function PATCH(request: Request, { params }: Params) {
           { status: 400 }
         );
       }
-      const movie = await updateMovieStatus(id, body.status);
-      if (!movie) {
-        return NextResponse.json(
-          { error: 'Película no encontrada' },
-          { status: 404 }
-        );
+    }
+
+    for (const key of ['current_season', 'current_episode'] as const) {
+      if (body[key] !== undefined && body[key] !== null) {
+        const value = Number(body[key]);
+        if (!Number.isInteger(value) || value < 1) {
+          return NextResponse.json(
+            { error: 'El progreso debe ser un número entero mayor a 0' },
+            { status: 400 }
+          );
+        }
       }
-      return NextResponse.json({ movie });
     }
 
     const movie = await updateMovie(id, body);
     if (!movie) {
       return NextResponse.json(
-        { error: 'Película no encontrada' },
+        { error: 'Título no encontrado' },
         { status: 404 }
       );
     }
@@ -61,7 +65,7 @@ export async function PATCH(request: Request, { params }: Params) {
   } catch (error) {
     console.error('Error updating movie:', error);
     return NextResponse.json(
-      { error: 'Error al actualizar película' },
+      { error: 'Error al actualizar el título' },
       { status: 500 }
     );
   }
@@ -73,7 +77,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     const success = await deleteMovie(id);
     if (!success) {
       return NextResponse.json(
-        { error: 'Película no encontrada' },
+        { error: 'Título no encontrado' },
         { status: 404 }
       );
     }
@@ -81,7 +85,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   } catch (error) {
     console.error('Error deleting movie:', error);
     return NextResponse.json(
-      { error: 'Error al eliminar película' },
+      { error: 'Error al eliminar el título' },
       { status: 500 }
     );
   }
